@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "rn-restaurant_search_app",
-    "slug": "rn-restaurant_search_app",
+    "name": "places-test-app",
+    "slug": "places-test-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
