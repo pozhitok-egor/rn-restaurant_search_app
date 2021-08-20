@@ -18,7 +18,7 @@ const SearchBar = ({ term, onTermChange, onTermSubmit }: Props) => {
       />
       <TextInput
         autoCorrect={false}
-        placeholder='Wyszukiwanie'
+        placeholder='Search'
         style={styles.inputStyle}
         value={term}
         onChangeText={onTermChange}

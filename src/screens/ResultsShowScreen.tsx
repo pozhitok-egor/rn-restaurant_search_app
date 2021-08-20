@@ -1,103 +1,173 @@
-import { FontAwesome5 } from '@expo/vector-icons';
-import React, { useEffect, useReducer, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View, FlatList, ScrollView } from 'react-native'
-import yelp from '../api/yelp';
-import { Props, resultsAction, resultState } from '../core/types/result';
-import { getStars } from '../core/utils';
-import Review, { IReview } from '../Components/Review';
-import Map from '../Components/Map';
+import {FontAwesome5} from "@expo/vector-icons";
+import React, {useEffect, useReducer, useState} from "react";
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  FlatList,
+  ScrollView,
+} from "react-native";
+import yelp from "../api/yelp";
+import {Props, resultsAction, resultState} from "../core/types/result";
+import {getStars} from "../core/utils";
+import Review from "../Components/Review";
+import Map from "../Components/Map";
+import google, {getPhoto} from "../api/google";
+import {PlaceReview} from "../core/types/Place";
 
-const reducer = (state: resultState, action: resultsAction ): resultState => {
-  switch(action.type) {
-    case 'SET_DATA':
-      return { ...state, data: action.payload, loading: false, error: null }
-    case 'SET_LOADING':
-      return { ...state, data: null, loading: true, error: null }
-    case 'SET_ERROR':
-      return { ...state, data: null, loading: false, error: action.payload }
+const reducer = (state: resultState, action: resultsAction): resultState => {
+  switch (action.type) {
+    case "SET_DATA":
+      return {
+        ...state,
+        data: {...state.data, ...action.payload},
+        loading: false,
+        error: null,
+      };
+    case "SET_LOADING":
+      return {...state, data: state.data, loading: true, error: null};
+    case "SET_ERROR":
+      return {...state, data: null, loading: false, error: action.payload};
     default:
-      return state
+      return state;
   }
 };
 
-const ResultsShowScreen = ({ route, navigation }: Props) => {
-  const [result, dispatch] = useReducer(reducer, { data: null, loading: false, error: null });
-  const [reviews, setReviews] = useState<Array<IReview>>([])
-  const id = route.params.id;
+const placesShowScreen = ({route, navigation}: Props) => {
+  const [place, dispatch] = useReducer(reducer, {
+    data: {...route.params.place},
+    loading: false,
+    error: null,
+  });
 
-  const getResult = async (id: string) => {
-    dispatch({type:'SET_LOADING'})
+  const image_url = getPhoto(
+    place.data && place.data.photos && place.data.photos[0]
+      ? place.data.photos[0].photo_reference
+      : ""
+  );
+
+  const getplace = async () => {
+    dispatch({type: "SET_LOADING"});
     try {
-      const placeResponse = await yelp.get(`/${id}`);
-      dispatch({type:'SET_DATA', payload: placeResponse.data})
-      navigation.setOptions({headerTintColor: '#FFFFFF'})
+      const placeResponse = await google.get("/details/json", {
+        params: {
+          place_id: place.data?.place_id,
+          fields: "photos,opening_hours,reviews",
+        },
+      });
+      dispatch({type: "SET_DATA", payload: placeResponse.data.result});
+      navigation.setOptions({headerTintColor: "#FFFFFF"});
     } catch (error) {
-      dispatch({type:'SET_ERROR', payload: error.message})
+      dispatch({type: "SET_ERROR", payload: error.message});
     }
-    try {
-      const reviewsResponse = await yelp.get(`/${id}/reviews?locale=pl_PL`);
-      setReviews(reviewsResponse.data.reviews)
-    } catch(error) {
-    }
-  }
+  };
 
-  const price = new Array(4).fill('#bbb')
-  result.data?.price && price.splice(0, result.data.price.length, ...Array(result.data.price.length).fill('white'))
+  const price = new Array(4).fill("#bbb");
+  place.data?.price_level &&
+    price.splice(
+      0,
+      place.data.price_level,
+      ...Array(place.data.price_level).fill("white")
+    );
 
   useEffect(() => {
-    getResult(id)
-  }, [])
+    getplace();
+  }, []);
 
   return (
     <>
-      { result.loading ?
-        <Text style={{flex: 1, textAlignVertical: 'center', textAlign: 'center'}}>
+      {place.loading ? (
+        <Text
+          style={{flex: 1, textAlignVertical: "center", textAlign: "center"}}
+        >
           Loading...
-        </Text> : null }
-      { result.error ? <Text style={{flex: 1, textAlignVertical: 'center', textAlign: 'center', color: '#ff3333'}}>{result.error}</Text> : null }
-      { result.data ?
+        </Text>
+      ) : place.error ? (
+        <Text
+          style={{
+            flex: 1,
+            textAlignVertical: "center",
+            textAlign: "center",
+            color: "#ff3333",
+          }}
+        >
+          {place.error}
+        </Text>
+      ) : place.data ? (
         <>
           <View style={styles.background}>
-            <Image style={styles.backgroundImage} source={result.data.image_url ?{uri: result.data.image_url} : require('../../assets/default_image.png')}/>
-            <View style={styles.darkerBackground}/>
+            <Image
+              style={styles.backgroundImage}
+              source={
+                image_url
+                  ? {uri: image_url}
+                  : require("../../assets/default_image.png")
+              }
+            />
+            <View style={styles.darkerBackground} />
             <View style={styles.backgroundTextView}>
-              <Text style={{color: 'white', fontSize: 20, fontWeight: 'bold'}}>{result.data.name}</Text>
-              <Text style={styles.backgroundText}>{result.data.location.country}, {result.data.location.state}, {result.data.location.city}, {result.data.location.address1} </Text>
+              <Text style={{color: "white", fontSize: 20, fontWeight: "bold"}}>
+                {place.data.name}
+              </Text>
+              <Text style={styles.backgroundText}>
+                {place.data.vicinity &&
+                  place.data.vicinity
+                    .split(" ")
+                    .map((val: string, index: number) => {
+                      return (
+                        <Text style={{marginRight: 5}} key={index}>
+                          {val}
+                        </Text>
+                      );
+                    })}
+              </Text>
               <View style={styles.priceView}>
-                { result.data.price ?
-                  price.map(((color, index) =>
-                    <Text key={index} style={{...styles.backgroundText, marginRight: 5}}>
-                      <FontAwesome5
-                        name='dollar-sign'
-                        color={color}
-                      />
-                    </Text>
-                  ))
-                  : null
-                }
+                {place.data.price_level
+                  ? price.map((color, index) => (
+                      <Text
+                        key={index}
+                        style={{...styles.backgroundText, marginRight: 5}}
+                      >
+                        <FontAwesome5 name="dollar-sign" color={color} />
+                      </Text>
+                    ))
+                  : null}
               </View>
             </View>
           </View>
-          <View style={{ flex:1, backgroundColor: 'white', marginTop: -30, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20}}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "white",
+              marginTop: -30,
+              borderTopLeftRadius: 30,
+              borderTopRightRadius: 30,
+              padding: 20,
+            }}
+          >
             <ScrollView>
               <View style={styles.tagsView}>
-                { result.data.categories?.length > 0 ?
-                  result.data.categories.map((value, index) =>
-                    <TouchableOpacity key={index} style={{...styles.tagStyle}}>
-                      <Text>{value.title}</Text>
-                    </TouchableOpacity>
-                  )
-                  : null
-                }
+                {place.data.types && place.data.types.length > 0
+                  ? place.data.types.map((value: string, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={{...styles.tagStyle}}
+                      >
+                        <Text>{value}</Text>
+                      </TouchableOpacity>
+                    ))
+                  : null}
               </View>
-              { result.data.photos.length > 0 ?
+              {place.data.photos && place.data.photos.length > 0 ? (
                 <FlatList
-                  style={{ maxHeight: 220 }}
+                  style={{maxHeight: 220}}
                   horizontal={true}
                   showsHorizontalScrollIndicator={false}
-                  keyExtractor={ restaurant => restaurant }
-                  data={result.data.photos}
-                  renderItem={({ item }) =>
+                  keyExtractor={(photo) => photo.photo_reference}
+                  data={place.data.photos}
+                  renderItem={({item}) => (
                     <Image
                       style={{
                         borderRadius: 20,
@@ -106,75 +176,86 @@ const ResultsShowScreen = ({ route, navigation }: Props) => {
                         width: 300,
                         height: 200,
                       }}
-                      source={{uri: item}}
+                      source={{uri: getPhoto(item.photo_reference)}}
                     />
-                  }
+                  )}
                 />
-                : null
-              }
-              <Map result={result.data}/>
-              <View style={{flexDirection: 'row', marginTop: 10, alignItems: 'center'}}>
-                {getStars(result.data.rating, {fontSize: 15, marginRight: 2})}
-                <Text style={{marginLeft: 10}}>{result.data.rating}</Text>
-                <Text style={{marginLeft: 5}}>({result.data.review_count})</Text>
-              </View>
-              <View>
-                {reviews.length > 0 ?
-                  reviews.map((review, index) =>
-                    <Review data={review} key={index}/>
-                  )
-                  : null
-                }
-              </View>
+              ) : null}
+              <Map place={place.data} location={route.params.userLocation}/>
+              {place.data.rating && place.data.user_ratings_total && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    marginTop: 10,
+                    alignItems: "center",
+                  }}
+                >
+                  {getStars(place.data.rating, {fontSize: 15, marginRight: 2})}
+                  <Text style={{marginLeft: 10}}>{place.data.rating}</Text>
+                  <Text style={{marginLeft: 5}}>
+                    ({place.data.user_ratings_total})
+                  </Text>
+                </View>
+              )}
+              {place.data.reviews && (
+                <View>
+                  {place.data.reviews.length > 0
+                    ? place.data.reviews.map(
+                        (review: PlaceReview, index: number) => (
+                          <Review data={review} key={index} />
+                        )
+                      )
+                    : null}
+                </View>
+              )}
             </ScrollView>
           </View>
         </>
-        : null
-      }
+      ) : null}
     </>
-  )
-}
+  );
+};
 
-export default ResultsShowScreen
+export default placesShowScreen;
 
 const styles = StyleSheet.create({
   background: {
-    position: 'relative',
+    position: "relative",
   },
   backgroundImage: {
-    width: '100%',
+    width: "100%",
     height: 330,
   },
   darkerBackground: {
-    position: 'absolute',
-    width: '100%',
+    position: "absolute",
+    width: "100%",
     height: 330,
     top: 0,
     left: 0,
-    backgroundColor: 'rgba(0,0,0,.5)'
+    backgroundColor: "rgba(0,0,0,.5)",
   },
   backgroundTextView: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 50,
-    left: 20
+    left: 20,
   },
   priceView: {
     marginTop: 5,
-    flexDirection: 'row'
+    flexDirection: "row",
   },
   backgroundText: {
     fontSize: 16,
-    color: 'white',
+    color: "white",
   },
   tagsView: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 10,
   },
   tagStyle: {
     marginRight: 10,
     padding: 10,
-    backgroundColor: '#eee',
-    borderRadius: 20
-  }
-})
+    backgroundColor: "#eee",
+    borderRadius: 20,
+  },
+});

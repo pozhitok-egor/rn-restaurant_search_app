@@ -4,19 +4,32 @@ import { Alert, Linking, Text, View } from "react-native";
 import { StyleProp, TextStyle } from "react-native";
 
 export const metersToTime = (meters: number): string => {
-  const timestamp = meters/1.39
+  const timestamp = meters/1.2
   const days = Math.floor(timestamp / 60 / 60 / 24);
   const hours = Math.floor(timestamp / 60 / 60);
   const minutes = Math.ceil(timestamp / 60) - (hours * 60);
 
   const output = []
   if (days > 0)
-    output.push(days + 'dni')
+    output.push(days + 'days')
   if (hours > 0)
-    output.push(hours + 'g')
+    output.push(hours + 'h')
   output.push(minutes + 'min')
 
   return output.join(' ');
+}
+
+export const distance = (latA: number, longA: number, latB: number, longB: number): number => {
+  const d2r = Math.PI / 180;
+
+  const dlong = (longA - longB) * d2r;
+  const dlat = (latA - latB) * d2r;
+  const a = Math.pow(Math.sin(dlat / 2.0), 2)
+      + Math.cos(latB * d2r) * Math.cos(latA * d2r)
+      * Math.pow(Math.sin(dlong / 2.0), 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return 6367 * c * 1000;
 }
 
 export const getStars = (rating: number, style?: StyleProp<TextStyle>, color?: string): ReactElement => {

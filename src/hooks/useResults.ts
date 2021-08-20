@@ -1,42 +1,45 @@
 import { useEffect, useState } from 'react';
 import yelp from '../api/yelp';
-import { IRestaurant } from '../Components/Restaurant';
 import * as Location from 'expo-location';
+import google from '../api/google';
+import { IPlace } from '../core/types/Place';
 
 export interface IResults {
   searchApi: (searchTerm: string) => Promise<void>;
-  restaurants: IRestaurant[];
+  restaurants: IPlace[];
   errorMessage: string;
+  userLocation: ILocation;
+}
+
+export interface ILocation {
+  lat: number;
+  lng: number;
 }
 
 export default ():IResults => {
-  const [restaurants, setRestaurants] = useState<IRestaurant[]>([]);
+  const [restaurants, setRestaurants] = useState<IPlace[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [userLocation, setUserLocation] = useState<ILocation>({lat: 52.229369682060565, lng: 21.008723627961643});
 
   const searchApi = async (searchTerm: string): Promise<void> => {
-    let locationParams;
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      locationParams = {
-        location: 'warsaw'
-      }
-    } else {
+    if (status === 'granted') {
       let location: Location.LocationObject = await Location.getCurrentPositionAsync({});
-      locationParams = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude
-      }
+      setUserLocation({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      });
     }
 
     try {
-      const response = await yelp.get('/search', {
-        params: { limit: 50,
-          term: searchTerm,
-          ...locationParams,
-          locale: 'pl_PL'
+      const response = await google.get('/nearbysearch/json',
+      {
+        params: {
+          location: `${userLocation.lat},${userLocation.lng}`,
+          keyword: searchTerm,
         }
-      });
-      setRestaurants(response.data.businesses)
+      })
+      setRestaurants(response.data.results)
     } catch (error) {
       setErrorMessage(error.message)
     }
@@ -53,5 +56,5 @@ export default ():IResults => {
     searchApi('restaurant');
   }, []);
 
-  return {searchApi, restaurants, errorMessage};
+  return {searchApi, restaurants, errorMessage, userLocation};
 };
